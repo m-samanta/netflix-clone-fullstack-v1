@@ -2,10 +2,13 @@ import { modalState } from "@/atoms/modalAtom";
 import Banner from "@/components/Banner";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
+import Plans from "@/components/Plans";
 import Row from "@/components/Row";
 import useAuth from "@/hooks/useAuth";
+import payments from "@/lib/stripe";
 import { Movie } from "@/typing";
 import requests from "@/utils/requests";
+import { Product, getProducts } from "@stripe/firestore-stripe-payments";
 import Head from "next/head";
 import { useRecoilValue } from "recoil";
 
@@ -32,10 +35,14 @@ export default function Home({
   trendingNow,
   products,
 }: Props) {
+  console.log(products)
   const { loading } = useAuth();
   const showModal = useRecoilValue(modalState);
+  const subscription = false;
 
-  if (loading) return null;
+  if (loading || subscription === null) return null;
+
+  if (!subscription) return <Plans products={products} />;
 
   return (
     <div
@@ -67,6 +74,13 @@ export default function Home({
 }
 
 export const getServerSideProps = async () => {
+  const products = await getProducts(payments, {
+    includePrices: true,
+    activeOnly: true,
+  })
+    .then((res) => res)
+    .catch((error) => console.log(error.message));
+
   const [
     netflixOriginals,
     trendingNow,
@@ -97,6 +111,7 @@ export const getServerSideProps = async () => {
       horrorMovies: horrorMovies.results,
       romanceMovies: romanceMovies.results,
       documentaries: documentaries.results,
+      // products,
     },
   };
 };
