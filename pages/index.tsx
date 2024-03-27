@@ -5,12 +5,13 @@ import Modal from "@/components/Modal";
 import Plans from "@/components/Plans";
 import Row from "@/components/Row";
 import useAuth from "@/hooks/useAuth";
-import payments from "@/lib/stripe";
-import { Movie } from "@/typing";
+import { Movie, Product } from "@/typing";
 import requests from "@/utils/requests";
-import { Product, getProducts } from "@stripe/firestore-stripe-payments";
+import { collection, getDocs, getFirestore } from "firebase/firestore";
 import Head from "next/head";
 import { useRecoilValue } from "recoil";
+import app, { db } from "@/firebase";
+import { FirebaseApp } from "firebase/app";
 
 interface Props {
   netflixOriginals: Movie[];
@@ -21,7 +22,7 @@ interface Props {
   horrorMovies: Movie[];
   romanceMovies: Movie[];
   documentaries: Movie[];
-  products: Product[];
+  products: (Product & { prices: { price: string }[] })[];
 }
 
 export default function Home({
@@ -34,15 +35,16 @@ export default function Home({
   topRated,
   trendingNow,
   products,
-}: Props) {
-  console.log(products)
+}:
+Props) {
+  console.log(products);
   const { loading } = useAuth();
   const showModal = useRecoilValue(modalState);
   const subscription = false;
 
   if (loading || subscription === null) return null;
 
-  if (!subscription) return <Plans products={products} />;
+  if (!subscription) return <Plans />;
 
   return (
     <div
@@ -74,12 +76,26 @@ export default function Home({
 }
 
 export const getServerSideProps = async () => {
-  const products = await getProducts(payments, {
-    includePrices: true,
-    activeOnly: true,
-  })
-    .then((res) => res)
-    .catch((error) => console.log(error.message));
+  const productRef = collection(db, "products");
+  const productSnapshot = await getDocs(productRef);
+  const products = productSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Product[];
+
+  const getProductPrice = async (app: FirebaseApp, product: Product) => {
+    const db = getFirestore(app);
+    const pricesRef = collection(db, "products", product.id, "prices");
+    const pricesSnapshot = await getDocs(pricesRef);
+    const prices = pricesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  
+    return prices;
+  };
+
+  const productPrices = await Promise.all(products.map(async (product) => {
+    const prices = await getProductPrice(app, product);
+    return { ...product, prices };
+  }));
 
   const [
     netflixOriginals,
@@ -111,7 +127,7 @@ export const getServerSideProps = async () => {
       horrorMovies: horrorMovies.results,
       romanceMovies: romanceMovies.results,
       documentaries: documentaries.results,
-      // products,
+      products: JSON.parse(JSON.stringify(productPrices)),
     },
   };
 };

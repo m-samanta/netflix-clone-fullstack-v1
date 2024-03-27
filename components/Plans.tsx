@@ -1,14 +1,10 @@
 import useAuth from "@/hooks/useAuth";
 import { CheckIcon } from "@heroicons/react/outline";
-import { Product } from "@stripe/firestore-stripe-payments";
 import Head from "next/head";
 import Link from "next/link";
 
-interface Props{
-  products: Product[];
-}
 
-function Plans({products}: Props) {
+function Plans() {
   const { logout } = useAuth();
 
   return (
