@@ -12,6 +12,7 @@ import Head from "next/head";
 import { useRecoilValue } from "recoil";
 import app, { db } from "@/firebase";
 import { FirebaseApp } from "firebase/app";
+import useSubscription from "@/hooks/useSubscription";
 
 interface Props {
   netflixOriginals: Movie[];
@@ -35,16 +36,16 @@ export default function Home({
   topRated,
   trendingNow,
   products,
-}:
-Props) {
+}: Props) {
   console.log(products);
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
   const showModal = useRecoilValue(modalState);
-  const subscription = false;
+  const subscription = useSubscription(user);
+    if (loading || subscription === null) return null;
 
-  if (loading || subscription === null) return null;
-
-  if (!subscription) return <Plans />;
+    if (!subscription) return <Plans products={products} />;
+    console.log(subscription)
+  
 
   return (
     <div
@@ -87,15 +88,20 @@ export const getServerSideProps = async () => {
     const db = getFirestore(app);
     const pricesRef = collection(db, "products", product.id, "prices");
     const pricesSnapshot = await getDocs(pricesRef);
-    const prices = pricesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  
+    const prices = pricesSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
     return prices;
   };
 
-  const productPrices = await Promise.all(products.map(async (product) => {
-    const prices = await getProductPrice(app, product);
-    return { ...product, prices };
-  }));
+  const productPrices = await Promise.all(
+    products.map(async (product) => {
+      const prices = await getProductPrice(app, product);
+      return { ...product, prices };
+    })
+  );
 
   const [
     netflixOriginals,

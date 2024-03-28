@@ -36,6 +36,14 @@ export interface Genre {
     id: string;
     name: string;
     price: number;
+    prices: array;
     description: string;
     image: string;
+    metadata: array;
+  }
+  
+  interface Subscription {
+    id: string;
+    status: string;
+    created: array;
   }
