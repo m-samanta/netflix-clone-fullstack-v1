@@ -1,24 +1,62 @@
-import { GetStaticProps } from 'next'
-import Head from 'next/head'
-import Link from 'next/link'
+import Head from "next/head";
+import Link from "next/link";
 // import Membership from '../components/Membership'
-import useAuth from '../hooks/useAuth'
-import useSubscription from '../hooks/useSubscription'
-import { Product } from '@/typing'
+import useAuth from "../hooks/useAuth";
+import { Product, Subscription } from "@/typing";
+import app, { db } from "@/firebase";
+import getPremiumStatus from "@/lib/getPremiumStatus";
+import { useEffect, useState } from "react";
+import { collection, getDocs, getFirestore } from "firebase/firestore";
+import { FirebaseApp } from "firebase/app";
+import Membership from "@/components/Membership";
 
 interface Props {
-  products: Product[]
+  products: (Product & { prices: { price: string }[] })[];
+  subscription: Subscription[];
 }
 
+function Account({  }: Props) {
+  const { logout } = useAuth();
+  const [subscription, setSubscription] = useState({created: {
+    seconds: 0}});
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+
+    const fetchProducts = async () => {
+      const productRef = collection(db, "products");
+      const productSnapshot = await getDocs(productRef);
+      const productsData = productSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Product[];
+      setProducts(productsData);
+    };
+
+    fetchProducts();
+
+    getPremiumStatus(app)
+      .then((premiumStatus) => {
+        if (premiumStatus.length > 0) {
+          setSubscription(premiumStatus[0]);
+        } else {
+          console.error("No premium subscription found.");
+        }
+      })
+      .catch((error) => {
+        console.error("Error retrieving premium status:", error);
+      });
 
 
-function Account({ products }: Props) {
-  console.log(products)
-  const { user, logout } = useAuth()
-  const subscription = useSubscription(user);
-  console.log(subscription)
+  }, []);
+  console.log(subscription);
 
-  
+  console.log(products);
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
+    return date.toUTCString();
+  };
 
   return (
     <div>
@@ -51,23 +89,27 @@ function Account({ products }: Props) {
           <div className="-ml-0.5 flex items-center gap-x-1.5">
             <img src="https://rb.gy/4vfk4r" alt="" className="h-7 w-7" />
             <p className="text-xs font-semibold text-[#555]">
-              Member since {subscription?.status}
+              Member since{" "}
+              {subscription.created?.seconds
+                ? formatDate(subscription.created.seconds)
+                : "N/A"}
             </p>
           </div>
         </div>
 
-        {/* <Membership /> */}
+        <Membership />
 
         <div className="mt-6 grid grid-cols-1 gap-x-4 border px-4 py-4 md:grid-cols-4 md:border-x-0 md:border-t md:border-b-0 md:px-0 md:pb-0">
           <h4 className="text-lg text-[gray]">Plan Details</h4>
           {/* Find the current plan */}
-          {/* <div className="col-span-2 font-medium">
+          <div className="col-span-2 font-medium">
             {
               products.filter(
-                (product) => product.id === subscription?.product
+                (product) =>
+                  product.id === subscription?.product._key.path.segments[6]
               )[0]?.name
             }
-          </div> */}
+          </div>
           <p className="cursor-pointer text-blue-500 hover:underline md:text-right">
             Change plan
           </p>
@@ -84,22 +126,42 @@ function Account({ products }: Props) {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
-export default Account
+export default Account;
 
-// export const getStaticProps: GetStaticProps = async () => {
-//   const products = await getProducts(payments, {
-//     includePrices: true,
-//     activeOnly: true,
-//   })
-//     .then((res) => res)
-//     .catch((error) => console.log(error.message))
+
+// export const getPlans = async () => {
+//   const productRef = collection(db, "products");
+//   const productSnapshot = await getDocs(productRef);
+//   const products = productSnapshot.docs.map((doc) => ({
+//     id: doc.id,
+//     ...doc.data(),
+//   })) as Product[];
+
+//   const getProductPrice = async (app: FirebaseApp, product: Product) => {
+//     const db = getFirestore(app);
+//     const pricesRef = collection(db, "products", product.id, "prices");
+//     const pricesSnapshot = await getDocs(pricesRef);
+//     const prices = pricesSnapshot.docs.map((doc) => ({
+//       id: doc.id,
+//       ...doc.data(),
+//     }));
+
+//     return prices;
+//   };
+
+//   const productPrices = await Promise.all(
+//     products.map(async (product) => {
+//       const prices = await getProductPrice(app, product);
+//       return { ...product, prices };
+//     })
+//   );
 
 //   return {
-//     props: {
-//       products,
-//     },
+//     props:{
+//     products: JSON.parse(JSON.stringify(productPrices)),
+//     }
 //   }
-// }
+// };
